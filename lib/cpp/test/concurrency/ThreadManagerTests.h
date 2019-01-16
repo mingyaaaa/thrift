@@ -19,7 +19,7 @@
 
 #include <thrift/thrift-config.h>
 #include <thrift/concurrency/ThreadManager.h>
-#include <thrift/concurrency/PlatformThreadFactory.h>
+#include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/concurrency/Monitor.h>
 #include <thrift/concurrency/Util.h>
 
@@ -36,8 +36,8 @@ namespace test {
 
 using namespace apache::thrift::concurrency;
 
-static std::deque<stdcxx::shared_ptr<Runnable> > m_expired;
-static void expiredNotifier(stdcxx::shared_ptr<Runnable> runnable)
+static std::deque<std::shared_ptr<Runnable> > m_expired;
+static void expiredNotifier(std::shared_ptr<Runnable> runnable)
 {
   m_expired.push_back(runnable);
 }
@@ -108,12 +108,9 @@ public:
 
     shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(workerCount);
 
-    shared_ptr<PlatformThreadFactory> threadFactory
-        = shared_ptr<PlatformThreadFactory>(new PlatformThreadFactory(false));
+    shared_ptr<ThreadFactory> threadFactory
+        = shared_ptr<ThreadFactory>(new ThreadFactory(false));
 
-#if !USE_BOOST_THREAD && !USE_STD_THREAD
-    threadFactory->setPriority(PosixThreadFactory::HIGHEST);
-#endif
     threadManager->threadFactory(threadFactory);
 
     threadManager->start();
@@ -257,12 +254,9 @@ public:
       shared_ptr<ThreadManager> threadManager
           = ThreadManager::newSimpleThreadManager(workerCount, pendingTaskMaxCount);
 
-      shared_ptr<PlatformThreadFactory> threadFactory
-          = shared_ptr<PlatformThreadFactory>(new PlatformThreadFactory());
+      shared_ptr<ThreadFactory> threadFactory
+          = shared_ptr<ThreadFactory>(new ThreadFactory());
 
-#if !USE_BOOST_THREAD && !USE_STD_THREAD
-      threadFactory->setPriority(PosixThreadFactory::HIGHEST);
-#endif
       threadManager->threadFactory(threadFactory);
 
       threadManager->start();
@@ -401,58 +395,19 @@ public:
       return false;
     }
 
-#if !USE_BOOST_THREAD && !USE_STD_THREAD
-    // test once with a detached thread factory and once with a joinable thread factory
-
-    shared_ptr<PosixThreadFactory> threadFactory
-        = shared_ptr<PosixThreadFactory>(new PosixThreadFactory(false));
-
-    std::cout << "\t\t\tapiTest with joinable thread factory" << std::endl;
-    if (!apiTestWithThreadFactory(threadFactory)) {
-      return false;
-    }
-
-    threadFactory.reset(new PosixThreadFactory(true));
-    std::cout << "\t\t\tapiTest with detached thread factory" << std::endl;
-    return apiTestWithThreadFactory(threadFactory);
-#else
-    return apiTestWithThreadFactory(shared_ptr<PlatformThreadFactory>(new PlatformThreadFactory()));
-#endif
+    return apiTestWithThreadFactory(shared_ptr<ThreadFactory>(new ThreadFactory()));
 
   }
 
-  bool apiTestWithThreadFactory(shared_ptr<PlatformThreadFactory> threadFactory)
+  bool apiTestWithThreadFactory(shared_ptr<ThreadFactory> threadFactory)
   {
     shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(1);
     threadManager->threadFactory(threadFactory);
 
-#if !USE_BOOST_THREAD && !USE_STD_THREAD
-    threadFactory->setPriority(PosixThreadFactory::HIGHEST);
-
-    // verify we cannot change the thread factory to one with the opposite detached setting
-    shared_ptr<PlatformThreadFactory> threadFactory2
-        = shared_ptr<PosixThreadFactory>(new PlatformThreadFactory(
-          PosixThreadFactory::ROUND_ROBIN,
-          PosixThreadFactory::NORMAL,
-          1,
-          !threadFactory->isDetached()));
-    try {
-      threadManager->threadFactory(threadFactory2);
-      // if the call succeeded we changed the thread factory to one that had the opposite setting for "isDetached()".
-      // this is bad, because the thread manager checks with the thread factory to see if it should join threads
-      // as they are leaving - so the detached status of new threads cannot change while there are existing threads.
-      std::cerr << "\t\t\tShould not be able to change thread factory detached disposition" << std::endl;
-      return false;
-    }
-    catch (InvalidArgumentException& ex) {
-      /* expected */
-    }
-#endif
-
     std::cout << "\t\t\t\tstarting.. " << std::endl;
 
     threadManager->start();
-    threadManager->setExpireCallback(expiredNotifier); // apache::thrift::stdcxx::bind(&ThreadManagerTests::expiredNotifier, this));
+    threadManager->setExpireCallback(expiredNotifier); // std::bind(&ThreadManagerTests::expiredNotifier, this));
 
 #define EXPECT(FUNC, COUNT) { size_t c = FUNC; if (c != COUNT) { std::cerr << "expected " #FUNC" to be " #COUNT ", but was " << c << std::endl; return false; } }
 

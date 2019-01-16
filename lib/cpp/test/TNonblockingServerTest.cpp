@@ -19,12 +19,12 @@
 
 #define BOOST_TEST_MODULE TNonblockingServerTest
 #include <boost/test/unit_test.hpp>
+#include <memory>
 
 #include "thrift/concurrency/Monitor.h"
 #include "thrift/concurrency/Thread.h"
 #include "thrift/server/TNonblockingServer.h"
 #include "thrift/transport/TNonblockingServerSocket.h"
-#include "thrift/stdcxx.h"
 
 #include "gen-cpp/ParentService.h"
 
@@ -33,13 +33,13 @@
 using apache::thrift::concurrency::Guard;
 using apache::thrift::concurrency::Monitor;
 using apache::thrift::concurrency::Mutex;
-using apache::thrift::concurrency::PlatformThreadFactory;
+using apache::thrift::concurrency::ThreadFactory;
 using apache::thrift::concurrency::Runnable;
 using apache::thrift::concurrency::Thread;
 using apache::thrift::concurrency::ThreadFactory;
 using apache::thrift::server::TServerEventHandler;
-using apache::thrift::stdcxx::make_shared;
-using apache::thrift::stdcxx::shared_ptr;
+using std::make_shared;
+using std::shared_ptr;
 
 using namespace apache::thrift;
 
@@ -147,12 +147,7 @@ protected:
     runner->userEventBase = userEventBase_;
 
     shared_ptr<ThreadFactory> threadFactory(
-        new PlatformThreadFactory(
-#if !USE_BOOST_THREAD && !USE_STD_THREAD
-            PlatformThreadFactory::OTHER, PlatformThreadFactory::NORMAL,
-            1,
-#endif
-            false));
+        new ThreadFactory(false));
     thread = threadFactory->newThread(runner);
     thread->start();
     runner->readyBarrier();

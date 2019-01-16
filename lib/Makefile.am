@@ -102,11 +102,14 @@ if WITH_CL
 SUBDIRS += cl
 endif
 
+if WITH_SWIFT
+SUBDIRS += swift
+endif
+
 # All of the libs that don't use Automake need to go in here
 # so they will end up in our release tarballs.
 EXTRA_DIST = \
 	as3 \
-	cocoa \
 	d \
 	dart \
 	delphi \
